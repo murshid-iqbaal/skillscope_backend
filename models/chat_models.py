@@ -16,11 +16,11 @@ class ChatRequest(BaseModel):
     )
 
 
-class ChatResponse(BaseModel):
-    response: str = Field(
+    reply: str = Field(
         ...,
         description="The AI-generated response",
     )
+
     model: str = Field(
         ...,
         description="The Groq model used to generate the response",

@@ -96,7 +96,8 @@ async def generate_response(
         model_used = data.get("model", settings.GROQ_MODEL)
 
         logger.info(f"Groq response received | model={model_used} | resp_len={len(response_text)}")
-        return {"response": response_text, "model": model_used}
+        return {"reply": response_text, "model": model_used}
+
 
     except httpx.TimeoutException:
         logger.error("Groq API request timed out.")

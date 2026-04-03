@@ -80,12 +80,16 @@ app.include_router(chat_router)
 @app.get("/", tags=["System"], summary="Root — API info")
 async def root():
     return {
-        "name": settings.APP_TITLE,
-        "version": settings.APP_VERSION,
-        "status": "running",
+        "message": "Welcome to SkillScope AI API",
+        "status": "online",
         "docs": "/docs",
-        "chat_endpoint": "POST /chat",
+        "endpoints": {
+            "chat": "POST /chat",
+            "health": "GET /health",
+            "health_groq": "GET /health/groq"
+        }
     }
+
 
 
 @app.get("/health", tags=["System"], summary="Health check")

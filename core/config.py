@@ -6,7 +6,7 @@ load_dotenv()
 class Settings:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_API_URL: str = "https://api.groq.com/openai/v1/chat/completions"
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
     APP_TITLE: str = "SkillScope AI Backend"
     APP_VERSION: str = "1.0.0"
