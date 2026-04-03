@@ -57,7 +57,8 @@ async def generate_response(
     Call Groq API with the user message and return the AI response text.
 
     Returns:
-        dict with keys: 'response' (str) and 'model' (str)
+        dict with keys: 'reply' (str) and 'model' (str)
+
 
     Raises:
         GroqServiceError and its subclasses on failure.
