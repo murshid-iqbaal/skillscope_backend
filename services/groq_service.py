@@ -1,111 +1,112 @@
 import json
 import logging
 import re
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from groq import AsyncGroq
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ──────────────────────────────────────────────
+# Exception Classes
+# ──────────────────────────────────────────────
 
 class GroqServiceError(Exception):
-    """Base exception for Groq service errors."""
     def __init__(self, message: str, error_type: str = "groq_error"):
         self.message = message
         self.error_type = error_type
         super().__init__(message)
 
-
 class GroqAuthError(GroqServiceError):
     def __init__(self):
-        super().__init__(
-            message="Invalid or missing Groq API key. Check your GROQ_API_KEY environment variable.",
-            error_type="auth_error",
-        )
-
+        super().__init__("Invalid or missing Groq API key.", "auth_error")
 
 class GroqRateLimitError(GroqServiceError):
     def __init__(self):
-        super().__init__(
-            message="Groq API rate limit reached. Please try again in a moment.",
-            error_type="rate_limit_error",
-        )
-
+        super().__init__("Groq API rate limit reached.", "rate_limit_error")
 
 class GroqTimeoutError(GroqServiceError):
     def __init__(self):
-        super().__init__(
-            message="Request to Groq API timed out. Please try again.",
-            error_type="timeout_error",
+        super().__init__("Request to Groq API timed out.", "timeout_error")
+
+class GroqNetworkError(GroqServiceError):
+    def __init__(self):
+        super().__init__("Network error connecting to Groq.", "network_error")
+
+# ──────────────────────────────────────────────
+# Internal Client Setup
+# ──────────────────────────────────────────────
+
+_client: Optional[AsyncGroq] = None
+
+def get_client() -> AsyncGroq:
+    global _client
+    if _client is None:
+        if not settings.GROQ_API_KEY:
+            raise GroqAuthError()
+        _client = AsyncGroq(
+            api_key=settings.GROQ_API_KEY,
+            timeout=settings.REQUEST_TIMEOUT,
         )
+    return _client
 
+def _handle_exception(e: Exception) -> None:
+    error_str = str(e).lower()
+    logger.error(f"Groq API error: {error_str}")
+    
+    if "rate_limit" in error_str:
+        raise GroqRateLimitError()
+    elif "timeout" in error_str:
+        raise GroqTimeoutError()
+    elif "authentication" in error_str or "api_key" in error_str:
+        raise GroqAuthError()
+    elif "connection" in error_str or "network" in error_str:
+        raise GroqNetworkError()
+    else:
+        raise GroqServiceError(f"AI service error: {error_str}", "api_error")
 
-class GroqService:
+# ──────────────────────────────────────────────
+# Public AI Functions
+# ──────────────────────────────────────────────
+
+async def generate_chat_response(message: str) -> Dict[str, Any]:
     """
-    Service for interacting with the Groq API for various AI tasks.
+    Standalone function to generate a career-focused chat response.
+    Standardized on llama3-70b-8192 for high-quality guidance.
     """
+    client = get_client()
+    try:
+        logger.info("Sending chat request to Groq | model=llama3-70b-8192")
+        completion = await client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role": "user", "content": message}],
+            temperature=0.7,
+            max_tokens=1024,
+        )
+        
+        response_text = completion.choices[0].message.content.strip()
+        return {"response": response_text, "model": completion.model}
 
-    def __init__(self) -> None:
-        self._client: Optional[AsyncGroq] = None
+    except Exception as e:
+        _handle_exception(e)
 
-    @property
-    def client(self) -> AsyncGroq:
-        if self._client is None:
-            if not settings.GROQ_API_KEY:
-                raise GroqAuthError()
-            self._client = AsyncGroq(
-                api_key=settings.GROQ_API_KEY,
-                timeout=settings.REQUEST_TIMEOUT,
-            )
-        return self._client
+async def analyze_resume_ai(resume_text: str, job_role: str) -> Dict[str, Any]:
+    """
+    Standalone function to perform deep resume analysis using AI.
+    Returns structured JSON results.
+    """
+    client = get_client()
+    prompt = f"""You are an expert ATS resume analyzer.
 
-    async def generate_response(
-        self,
-        message: str,
-        temperature: float = 0.7,
-        max_tokens: int = 1024,
-    ) -> dict:
-        """
-        Call Groq API with the user message and return the AI response text.
-        """
-        try:
-            logger.info(f"Sending chat request to Groq | model={settings.GROQ_MODEL}")
-            completion = await self.client.chat.completions.create(
-                model=settings.GROQ_MODEL,
-                messages=[{"role": "user", "content": message}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            
-            response_text = completion.choices[0].message.content.strip()
-            model_used = completion.model
-
-            logger.info(f"Groq response received | model={model_used}")
-            return {"response": response_text, "model": model_used}
-
-
-        except Exception as e:
-            self._handle_exception(e)
-
-    async def analyze_resume_ai(
-        self,
-        resume_text: str,
-        job_role: str,
-    ) -> dict:
-        """
-        Analyze a resume against a job role using Groq AI.
-        """
-        prompt = f"""You are an expert ATS resume analyzer.
-
-Analyze the following resume for the given job role.
+Analyze the resume for the given job role.
 
 Job Role: {job_role}
 
 Resume:
 {resume_text}
 
-Return ONLY valid JSON with the following structure:
+Return ONLY valid JSON:
 
 {{
 "matchScore": number (0-100),
@@ -114,73 +115,48 @@ Return ONLY valid JSON with the following structure:
 "suggestions": "short improvement suggestions"
 }}
 
-Do not include any explanation outside JSON."""
+No explanation outside JSON."""
 
-        try:
-            logger.info(f"Sending resume analysis request to Groq | role={job_role} | model=llama3-70b-8192")
-            completion = await self.client.chat.completions.create(
-                model="llama3-70b-8192",
-
-                messages=[{"role": "system", "content": "You are a professional ATS analyzer."},
-                          {"role": "user", "content": prompt}],
-                temperature=0.2, # Lower temperature for strictly formatted output
-                response_format={"type": "json_object"},
-            )
-            
-            raw_content = completion.choices[0].message.content.strip()
-            logger.info("Groq resume analysis received.")
-            
-            parsed_data = self._parse_json_safely(raw_content)
-            parsed_data["model"] = completion.model
-            return parsed_data
-
-        except Exception as e:
-            self._handle_exception(e)
-
-    def _parse_json_safely(self, raw_text: str) -> dict:
-        """Extract and parse JSON from model output."""
-        try:
-            return json.loads(raw_text)
-        except json.JSONDecodeError:
-            # Fallback: extract using regex if the model included extra text
-            match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group())
-                except json.JSONDecodeError:
-                    pass
-            
-            logger.error(f"Failed to parse JSON from AI response: {raw_text}")
-            raise GroqServiceError(
-                message="AI returned an invalid response format.",
-                error_type="parse_error",
-            )
-
-    def _handle_exception(self, e: Exception) -> None:
-        """Map Groq API exceptions to internal service errors."""
-        error_str = str(e)
-        logger.error(f"Groq API error: {error_str}")
+    try:
+        logger.info(f"Sending resume analysis request to Groq | role={job_role} | model=llama3-70b-8192")
+        completion = await client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[
+                {"role": "system", "content": "You are a professional ATS analyzer."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2, # Strict deterministic output
+            response_format={"type": "json_object"},
+        )
         
-        if "rate_limit" in error_str.lower():
-            raise GroqRateLimitError()
-        elif "timeout" in error_str.lower():
-            raise GroqTimeoutError()
-        elif "authentication" in error_str.lower() or "api_key" in error_str.lower():
-            raise GroqAuthError()
-        else:
-            raise GroqServiceError(
-                message=f"An error occurred while contacting the AI service: {error_str}",
-                error_type="api_error",
-            )
+        raw_content = completion.choices[0].message.content.strip()
+        parsed_data = _parse_json_safely(raw_content)
+        parsed_data["model"] = completion.model
+        return parsed_data
 
-    async def health_check(self) -> Optional[str]:
-        """Verify internal connectivity to Groq."""
-        try:
-            await self.generate_response("Say OK", max_tokens=10)
-            return None
-        except Exception as e:
-            return str(e)
+    except Exception as e:
+        _handle_exception(e)
 
+def _parse_json_safely(raw_text: str) -> Dict[str, Any]:
+    """Helper to safely extract and parse JSON from AI output."""
+    try:
+        return json.loads(raw_text)
+    except json.JSONDecodeError:
+        # Regex fallback for embedded JSON
+        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+        
+        logger.error(f"Failed to parse JSON: {raw_text}")
+        raise GroqServiceError("Invalid JSON response from AI.", "parse_error")
 
-# Module-level singleton
-groq_service = GroqService()
+async def health_check() -> Optional[str]:
+    """Connectivity check for deployment validation."""
+    try:
+        await generate_chat_response("Say healthy")
+        return None
+    except Exception as e:
+        return str(e)

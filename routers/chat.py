@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from models.chat_models import ChatRequest, ChatResponse, ErrorResponse
 from services.groq_service import (
-    generate_response,
+    generate_chat_response,
     GroqAuthError,
     GroqRateLimitError,
     GroqTimeoutError,
@@ -29,7 +29,6 @@ router = APIRouter(
     ),
     responses={
         200: {"description": "AI response returned successfully"},
-        400: {"model": ErrorResponse, "description": "Invalid request"},
         401: {"model": ErrorResponse, "description": "Invalid API key"},
         429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
         408: {"model": ErrorResponse, "description": "Request timeout"},
@@ -44,15 +43,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
     logger.info(f"Chat request received | msg_len={len(request.message)}")
 
     try:
-        result = await generate_response(message=request.message)
+        # Call standalone async function from groq_service
+        result = await generate_chat_response(message=request.message)
 
         return ChatResponse(
             response=result["response"],
             model=result["model"],
             conversation_id=request.conversation_id,
         )
-
-
 
     except GroqAuthError as e:
         logger.error(f"Auth error: {e.message}")
