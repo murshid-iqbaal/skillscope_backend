@@ -111,6 +111,36 @@ async def health():
     )
 
 
+from models.resume_models import JobRoleSkills, LearningResourceRequest
+from typing import List
+
+@app.get("/job-roles", response_model=List[JobRoleSkills], tags=["Data Models"])
+async def get_job_roles():
+    """Mock endpoint returning common tech job roles and required skills."""
+    return [
+        {"role": "Flutter Developer", "skills": ["Dart", "Flutter", "State Management", "Firebase"]},
+        {"role": "Backend Developer", "skills": ["Python", "FastAPI", "SQL", "Docker"]},
+        {"role": "Data Scientist", "skills": ["Python", "Machine Learning", "Pandas", "Scikit-Learn"]},
+        {"role": "Frontend Developer", "skills": ["JavaScript", "React", "CSS", "HTML"]},
+        {"role": "DevOps Engineer", "skills": ["AWS", "Kubernetes", "Docker", "CI/CD"]},
+    ]
+
+
+@app.post("/learning-resources", tags=["Data Models"])
+async def get_learning_resources(request: LearningResourceRequest):
+    """Mock endpoint returning learning resources for requested skills."""
+    # Build a simple mock response based on the requested skills
+    resources = []
+    for skill in request.skills:
+        resources.append({
+            "title": f"Mastering {skill}",
+            "url": f"https://example.com/learn-{skill.lower().replace(' ', '-')}",
+            "description": f"A comprehensive guide to {skill}",
+            "platform": "SkillScope Academy"
+        })
+    return resources
+
+
 @app.get("/health/groq", tags=["System"], summary="Groq API connectivity check")
 async def health_groq():
     """

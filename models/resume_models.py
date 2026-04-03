@@ -34,6 +34,15 @@ class ResumeAnalyzeResponse(BaseModel):
     model: Optional[str] = Field(default=None, description="The model used for analysis")
 
 
+class JobRoleSkills(BaseModel):
+    role: str = Field(..., description="The job role name")
+    skills: List[str] = Field(default_factory=list, description="List of required skills")
+
+
+class LearningResourceRequest(BaseModel):
+    skills: List[str] = Field(..., description="Skills to fetch resources for")
+
+
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Human-readable error description")
     error_type: str = Field(..., description="Category of error")
