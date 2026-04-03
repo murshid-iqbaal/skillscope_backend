@@ -47,10 +47,11 @@ async def chat(request: ChatRequest) -> ChatResponse:
         result = await generate_response(message=request.message)
 
         return ChatResponse(
-            reply=result["reply"],
+            response=result["response"],
             model=result["model"],
             conversation_id=request.conversation_id,
         )
+
 
 
     except GroqAuthError as e:

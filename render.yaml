@@ -1,22 +1,15 @@
 services:
   - type: web
-    name: skillscope-ai-backend
+    name: skillscope-backend
     runtime: python
-    pythonVersion: 3.11.0   # ✅ ADD THIS LINE (IMPORTANT)
-
-    region: oregon
-    plan: free
-
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
-    healthCheckPath: /health
-
     envVars:
       - key: GROQ_API_KEY
         sync: false
-
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
-
       - key: REQUEST_TIMEOUT
         value: "30"
+      - key: PYTHON_VERSION
+        value: "3.11.0"

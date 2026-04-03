@@ -82,7 +82,8 @@ class GroqService:
             model_used = completion.model
 
             logger.info(f"Groq response received | model={model_used}")
-            return {"reply": response_text, "model": model_used}
+            return {"response": response_text, "model": model_used}
+
 
         except Exception as e:
             self._handle_exception(e)
@@ -116,9 +117,10 @@ Return ONLY valid JSON with the following structure:
 Do not include any explanation outside JSON."""
 
         try:
-            logger.info(f"Sending resume analysis request to Groq | role={job_role}")
+            logger.info(f"Sending resume analysis request to Groq | role={job_role} | model=llama3-70b-8192")
             completion = await self.client.chat.completions.create(
-                model=settings.GROQ_MODEL,
+                model="llama3-70b-8192",
+
                 messages=[{"role": "system", "content": "You are a professional ATS analyzer."},
                           {"role": "user", "content": prompt}],
                 temperature=0.2, # Lower temperature for strictly formatted output
