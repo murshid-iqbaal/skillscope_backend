@@ -16,7 +16,7 @@ services:
         sync: false
 
       - key: GROQ_MODEL
-        value: llama3-8b-8192
+        value: llama-3.1-8b-instant
 
       - key: REQUEST_TIMEOUT
         value: "30"

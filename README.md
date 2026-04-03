@@ -175,7 +175,7 @@ Set via `GROQ_MODEL` environment variable:
 | Model                  | Context  | Best For                     |
 |------------------------|----------|------------------------------|
 | `llama3-70b-8192`      | 8K       | Best quality (default)       |
-| `llama3-8b-8192`       | 8K       | Faster, lighter              |
+| `llama-3.1-8b-instant`       | 8K       | Faster, lighter              |
 | `mixtral-8x7b-32768`   | 32K      | Long context conversations   |
 | `gemma-7b-it`          | 8K       | Efficient alternative        |
 
