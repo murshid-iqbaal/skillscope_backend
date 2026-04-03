@@ -2,6 +2,13 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 
+class LearningResource(BaseModel):
+    title: str = Field(..., description="Title of the resource")
+    url: str = Field(..., description="Direct link to the resource")
+    description: Optional[str] = Field(default=None, description="Why it's recommended")
+    platform: Optional[str] = Field(default=None, description="Platform (e.g. Coursera)")
+
+
 class ResumeAnalyzeRequest(BaseModel):
     job_role: str = Field(
         ...,
@@ -16,10 +23,14 @@ class ResumeAnalyzeRequest(BaseModel):
 
 
 class ResumeAnalyzeResponse(BaseModel):
+    jobRole: Optional[str] = Field(default=None, description="Echoed job role")
     matchScore: int = Field(..., description="Match score between 0 and 100")
     detectedSkills: List[str] = Field(..., description="List of skills detected in the resume")
     missingSkills: List[str] = Field(..., description="List of missing skills for the job role")
-    suggestions: str = Field(..., description="Short improvement suggestions")
+    recommendedResources: List[LearningResource] = Field(
+        default_factory=list, 
+        description="List of AI recommended learning resources"
+    )
     model: Optional[str] = Field(default=None, description="The model used for analysis")
 
 

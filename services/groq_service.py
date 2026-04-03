@@ -20,19 +20,19 @@ class GroqServiceError(Exception):
 
 class GroqAuthError(GroqServiceError):
     def __init__(self):
-        super().__init__("Invalid or missing Groq API key.", "auth_error")
+        super().__init__("Invalid or missing Groq API key. Please check your GROQ_API_KEY.", "auth_error")
 
 class GroqRateLimitError(GroqServiceError):
     def __init__(self):
-        super().__init__("Groq API rate limit reached.", "rate_limit_error")
+        super().__init__("Groq API rate limit reached. Please try again later.", "rate_limit_error")
 
 class GroqTimeoutError(GroqServiceError):
     def __init__(self):
-        super().__init__("Request to Groq API timed out.", "timeout_error")
+        super().__init__("Request to Groq API timed out. Try reducing resume length.", "timeout_error")
 
 class GroqNetworkError(GroqServiceError):
     def __init__(self):
-        super().__init__("Network error connecting to Groq.", "network_error")
+        super().__init__("Network error connecting to Groq. Please check your connection.", "network_error")
 
 # ──────────────────────────────────────────────
 # Internal Client Setup
@@ -53,7 +53,7 @@ def get_client() -> AsyncGroq:
 
 def _handle_exception(e: Exception) -> None:
     error_str = str(e).lower()
-    logger.error(f"Groq API error: {error_str}")
+    logger.error(f"Groq API error encountered: {error_str}")
     
     if "rate_limit" in error_str:
         raise GroqRateLimitError()
@@ -64,7 +64,7 @@ def _handle_exception(e: Exception) -> None:
     elif "connection" in error_str or "network" in error_str:
         raise GroqNetworkError()
     else:
-        raise GroqServiceError(f"AI service error: {error_str}", "api_error")
+        raise GroqServiceError(f"Unexpected AI service error: {error_str}", "api_error")
 
 # ──────────────────────────────────────────────
 # Public AI Functions
@@ -72,60 +72,68 @@ def _handle_exception(e: Exception) -> None:
 
 async def generate_chat_response(message: str) -> Dict[str, Any]:
     """
-    Standalone function to generate a career-focused chat response.
-    Standardized on llama3-70b-8192 for high-quality guidance.
+    Generate a career-focused chat response.
+    Standardized on llama-3.1-8b-instant for fast, low-latency responses.
     """
     client = get_client()
     try:
-        logger.info("Sending chat request to Groq | model=llama3-70b-8192")
+        logger.info(f"Chat request to Groq | model=llama-3.1-8b-instant")
         completion = await client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": message}],
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "You are SkillScope AI, a career and technology mentor. Give concise, helpful advice."},
+                {"role": "user", "content": message}
+            ],
             temperature=0.7,
             max_tokens=1024,
         )
         
         response_text = completion.choices[0].message.content.strip()
-        return {"response": response_text, "model": completion.model}
+        # Standardized on 'reply' key as per newest request
+        return {"reply": response_text, "model": completion.model}
 
     except Exception as e:
         _handle_exception(e)
 
 async def analyze_resume_ai(resume_text: str, job_role: str) -> Dict[str, Any]:
     """
-    Standalone function to perform deep resume analysis using AI.
-    Returns structured JSON results.
+    Analyze a resume against a job role and return structured analysis + resources.
+    Standardized on llama-3.1-8b-instant.
     """
     client = get_client()
-    prompt = f"""You are an expert ATS resume analyzer.
+    prompt = f"""You are an expert ATS (Applicant Tracking System) analyzer.
 
-Analyze the resume for the given job role.
+Task: Analyze the resume for the job role: {job_role}.
 
-Job Role: {job_role}
-
-Resume:
+Resume Text:
 {resume_text}
 
-Return ONLY valid JSON:
-
+Return ONLY a perfectly formatted JSON object with this exact structure:
 {{
-"matchScore": number (0-100),
-"detectedSkills": [list of skills],
-"missingSkills": [list of missing skills],
-"suggestions": "short improvement suggestions"
+  "matchScore": number (0-100),
+  "detectedSkills": ["skill1", "skill2"],
+  "missingSkills": ["missing1", "missing2"],
+  "recommendedResources": [
+    {{
+      "title": "Course/Resource Name",
+      "url": "https://direct-link.com",
+      "description": "Short description of why it helps",
+      "platform": "Coursera/Udemy/etc"
+    }}
+  ]
 }}
 
-No explanation outside JSON."""
+No conversational text outside the JSON block."""
 
     try:
-        logger.info(f"Sending resume analysis request to Groq | role={job_role} | model=llama3-70b-8192")
+        logger.info(f"Resume analysis to Groq | role={job_role} | model=llama-3.1-8b-instant")
         completion = await client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You are a professional ATS analyzer."},
+                {"role": "system", "content": "You are a professional resume auditor."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2, # Strict deterministic output
+            temperature=0.1, # Keep it strictly deterministic
             response_format={"type": "json_object"},
         )
         
@@ -138,11 +146,10 @@ No explanation outside JSON."""
         _handle_exception(e)
 
 def _parse_json_safely(raw_text: str) -> Dict[str, Any]:
-    """Helper to safely extract and parse JSON from AI output."""
+    """Extract and parse JSON from AI string with regex fallback."""
     try:
         return json.loads(raw_text)
     except json.JSONDecodeError:
-        # Regex fallback for embedded JSON
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if match:
             try:
@@ -150,13 +157,13 @@ def _parse_json_safely(raw_text: str) -> Dict[str, Any]:
             except json.JSONDecodeError:
                 pass
         
-        logger.error(f"Failed to parse JSON: {raw_text}")
-        raise GroqServiceError("Invalid JSON response from AI.", "parse_error")
+        logger.error(f"JSON Parsing failed for AI output: {raw_text}")
+        raise GroqServiceError("The AI service returned an unreadable response format.", "parse_error")
 
 async def health_check() -> Optional[str]:
-    """Connectivity check for deployment validation."""
+    """Diagnostic health check for deployment monitors."""
     try:
-        await generate_chat_response("Say healthy")
+        await generate_chat_response("ping")
         return None
     except Exception as e:
         return str(e)

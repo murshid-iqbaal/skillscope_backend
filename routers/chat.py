@@ -47,7 +47,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         result = await generate_chat_response(message=request.message)
 
         return ChatResponse(
-            response=result["response"],
+            reply=result["reply"],
             model=result["model"],
             conversation_id=request.conversation_id,
         )
