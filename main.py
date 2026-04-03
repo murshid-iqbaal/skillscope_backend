@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from core.config import settings
 from routers.chat import router as chat_router
 from routers.resume import router as resume_router
+from routers.skills import router as skills_router
+
 
 
 # ──────────────────────────────────────────────
@@ -74,6 +76,8 @@ app.add_middleware(
 # ──────────────────────────────────────────────
 app.include_router(chat_router)
 app.include_router(resume_router)
+app.include_router(skills_router)
+
 
 
 

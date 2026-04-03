@@ -115,10 +115,10 @@ Return ONLY a perfectly formatted JSON object with this exact structure:
   "missingSkills": ["missing1", "missing2"],
   "recommendedResources": [
     {{
-      "title": "Course/Resource Name",
-      "url": "https://direct-link.com",
-      "description": "Short description of why it helps",
-      "platform": "Coursera/Udemy/etc"
+      "title": "A highly relevant YouTube tutorial or Course name (e.g. Flutter State Management Masterclass)",
+      "url": "A direct valid HTTPS link to a YouTube video, Coursera, or Udemy course related specifically to the missing skill",
+      "description": "Short, punchy description of why this resource helps bridge the specific gap",
+      "platform": "YouTube / Coursera / Udemy"
     }}
   ]
 }}
