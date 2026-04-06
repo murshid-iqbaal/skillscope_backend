@@ -86,13 +86,19 @@ async def validate_resume(
         )
         
         # 3. Wrap in 'analysis' key (expected by Flutter ResumeApiService)
+        # Always log resource URLs for debugging
+        resources = result.get("recommendedResources", [])
+        for r in resources:
+            url = r.get("url", "")
+            logger.info(f"Generated resource URL: {url}")
+
         return {
             "analysis": {
-                "jobRole": job_role,
+                "jobRole": result.get("jobRole") or job_role,
                 "matchScore": result.get("matchScore", 0),
                 "detectedSkills": result.get("detectedSkills", []),
                 "missingSkills": result.get("missingSkills", []),
-                "recommendedResources": result.get("recommendedResources", []),
+                "recommendedResources": resources,
                 "model": result.get("model"),
             }
         }
