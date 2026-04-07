@@ -95,6 +95,59 @@ async def generate_chat_response(message: str) -> Dict[str, Any]:
     except Exception as e:
         _handle_exception(e)
 
+async def generate_skill_resources(skill_name: str) -> Dict[str, Any]:
+    """
+    Generate high-quality learning resources for a specific skill using Groq.
+    This generates 3-5 direct resource links for the given skill.
+    """
+    client = get_client()
+    prompt = f"""You are a master technical educator and career mentor.
+    
+    Task: Provide 3-5 high-quality, direct learning resources for the skill: {skill_name}.
+    
+    Return ONLY a perfectly formatted JSON object with this exact structure:
+    {{
+      "skill": "{skill_name}",
+      "recommendedResources": [
+        {{
+          "title": "Resource title (e.g. Flutter State Management Masterclass)",
+          "url": "VALID FULL HTTPS URL — must start with https://",
+          "description": "One sentence about why this resource is excellent for learning {skill_name}",
+          "platform": "YouTube / Coursera / Udemy / Official Docs"
+        }}
+      ]
+    }}
+    
+    STRICT URL RULES:
+    - Every url MUST start with https://
+    - Focus on primary documentation, reputable YouTube channels, and top courses.
+    - No broken links or generic search pages.
+    - DO NOT include null or placeholder URLs.
+    
+    No conversational text outside the JSON block."""
+
+    try:
+        logger.info(f"Skill resources request to Groq | skill={skill_name} | model=llama-3.1-8b-instant")
+        completion = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "You are a professional educational consultant. Always return valid JSON with direct, functional HTTPS URLs."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
+
+        raw_content = completion.choices[0].message.content.strip()
+        parsed_data = _parse_json_safely(raw_content)
+        
+        # Sanitize and ensure structure matches
+        parsed_data = _sanitize_resources(parsed_data)
+        return parsed_data
+
+    except Exception as e:
+        _handle_exception(e)
+
 async def analyze_resume_ai(resume_text: str, job_role: str) -> Dict[str, Any]:
     """
     Analyze a resume against a job role and return structured analysis + resources.
