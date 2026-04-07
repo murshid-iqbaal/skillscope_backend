@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, status, File, UploadFile, Form, BackgroundTasks
 
 from models.resume_models import ResumeAnalyzeRequest, ResumeAnalyzeResponse, ErrorResponse
 from services.groq_service import (
@@ -10,6 +10,8 @@ from services.groq_service import (
     GroqTimeoutError,
 )
 from utils.document_parser import parse_resume
+from core.supabase import get_supabase
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,10 @@ router = APIRouter(
         200: {"description": "Resume analyzed successfully"},
     },
 )
-async def analyze_resume(request: ResumeAnalyzeRequest) -> ResumeAnalyzeResponse:
+async def analyze_resume(
+    request: ResumeAnalyzeRequest,
+    background_tasks: BackgroundTasks,
+) -> ResumeAnalyzeResponse:
     """
     Primary endpoint for text-based resume analysis using Groq.
     """
@@ -45,6 +50,15 @@ async def analyze_resume(request: ResumeAnalyzeRequest) -> ResumeAnalyzeResponse
         result = await analyze_resume_ai(
             resume_text=resume_text,
             job_role=request.job_role,
+        )
+
+        # 2. Save to database for analytics (Background Task)
+        background_tasks.add_task(
+            _save_analysis_to_db,
+            user_id=request.user_id,
+            match_score=result.get("matchScore", 0),
+            detected_skills=result.get("detected_skills", result.get("detectedSkills", [])),
+            missing_skills=result.get("missing_skills", result.get("missingSkills", [])),
         )
 
         return ResumeAnalyzeResponse(
@@ -68,6 +82,8 @@ async def analyze_resume(request: ResumeAnalyzeRequest) -> ResumeAnalyzeResponse
 async def validate_resume(
     job_role: str = Form(..., description="Target job role"),
     resume: UploadFile = File(..., description="Resume file (PDF/Docx)"),
+    background_tasks: BackgroundTasks = None,
+    user_id: Optional[str] = Form(None, description="Optional user ID"),
 ):
     """
     Multipart endpoint for file-based resume analysis.
@@ -92,6 +108,16 @@ async def validate_resume(
             url = r.get("url", "")
             logger.info(f"Generated resource URL: {url}")
 
+        # 3. Save to database for analytics (Background Task)
+        if background_tasks:
+            background_tasks.add_task(
+                _save_analysis_to_db,
+                user_id=user_id,
+                match_score=result.get("matchScore", 0),
+                detected_skills=result.get("detected_skills", result.get("detectedSkills", [])),
+                missing_skills=result.get("missing_skills", result.get("missingSkills", [])),
+            )
+
         return {
             "analysis": {
                 "jobRole": result.get("jobRole") or job_role,
@@ -105,6 +131,37 @@ async def validate_resume(
         
     except Exception as e:
         _handle_groq_exception(e)
+
+
+def _save_analysis_to_db(
+    user_id: Optional[str],
+    match_score: int,
+    detected_skills: list,
+    missing_skills: list,
+):
+    """
+    Persist analysis results to Supabase for admin dashboard tracking.
+    Fails gracefully to not block the user response.
+    """
+    supabase = get_supabase()
+    if not supabase:
+        logger.warning("Supabase client not available, skipping analysis persistence.")
+        return
+
+    try:
+        data = {
+            "match_score": match_score,
+            "detected_skills": detected_skills,
+            "missing_skills": missing_skills,
+        }
+        if user_id:
+            data["user_id"] = user_id
+
+        # Insert into the resume_analysis table
+        supabase.table("resume_analysis").insert(data).execute()
+        logger.info(f"Successfully persisted resume analysis for user={user_id or 'anonymous'}")
+    except Exception as e:
+        logger.error(f"Failed to persist resume analysis to DB: {e}")
 
 
 def _handle_groq_exception(e: Exception):
