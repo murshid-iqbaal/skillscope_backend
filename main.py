@@ -127,18 +127,18 @@ async def get_job_roles():
 
 
 @app.post("/learning-resources", tags=["Data Models"])
-async def get_learning_resources(request: LearningResourceRequest):
-    """Mock endpoint returning learning resources for requested skills."""
-    # Build a simple mock response based on the requested skills
-    resources = []
+async def get_learning_resources_endpoint(request: LearningResourceRequest):
+    """Fetch learning resources for requested skills from DB or AI."""
+    from services.resource_service import get_learning_resources
+    
+    all_resources = []
     for skill in request.skills:
-        resources.append({
-            "title": f"Mastering {skill}",
-            "url": f"https://example.com/learn-{skill.lower().replace(' ', '-')}",
-            "description": f"A comprehensive guide to {skill}",
-            "platform": "SkillScope Academy"
-        })
-    return resources
+        result = await get_learning_resources(skill)
+        # Flatten the resources if found
+        if "recommendedResources" in result:
+            all_resources.extend(result["recommendedResources"])
+            
+    return all_resources
 
 
 @app.get("/health/groq", tags=["System"], summary="Groq API connectivity check")

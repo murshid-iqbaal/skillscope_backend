@@ -2,7 +2,7 @@ import logging
 from typing import List
 from fastapi import APIRouter
 from models.skill_models import Skill
-from services.groq_service import generate_skill_resources
+from services.resource_service import get_learning_resources
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +66,9 @@ async def get_skill_resources(skill_name: str):
     Returns a list of learning resources for the requested skill.
     Uses Groq to generate high-quality, direct links.
     """
-    logger.info(f"Generating resources via Groq for: {skill_name}")
+    logger.info(f"Fetching resources for: {skill_name}")
     try:
-        resources_data = await generate_skill_resources(skill_name)
+        resources_data = await get_learning_resources(skill_name)
         return resources_data
     except Exception as e:
         logger.error(f"Failed to generate resources for {skill_name}: {str(e)}")
