@@ -64,8 +64,16 @@ async def analyze_resume(
         return ResumeAnalyzeResponse(
             jobRole=request.job_role,
             matchScore=result.get("matchScore", 0),
+            atsScore=result.get("atsScore", 0),
+            keywordCoverage=result.get("keywordCoverage", 0),
             detectedSkills=result.get("detectedSkills", []),
             missingSkills=result.get("missingSkills", []),
+            sectionScores=result.get("sectionScores", []),
+            atsChecks=result.get("atsChecks", []),
+            strengths=result.get("strengths", []),
+            improvementPriorities=result.get("improvementPriorities", []),
+            rewriteSuggestions=result.get("rewriteSuggestions", []),
+            summary=result.get("summary"),
             recommendedResources=result.get("recommendedResources", []),
             model=result.get("model"),
         )
@@ -122,8 +130,16 @@ async def validate_resume(
             "analysis": {
                 "jobRole": result.get("jobRole") or job_role,
                 "matchScore": result.get("matchScore", 0),
+                "atsScore": result.get("atsScore", 0),
+                "keywordCoverage": result.get("keywordCoverage", 0),
                 "detectedSkills": result.get("detectedSkills", []),
                 "missingSkills": result.get("missingSkills", []),
+                "sectionScores": result.get("sectionScores", []),
+                "atsChecks": result.get("atsChecks", []),
+                "strengths": result.get("strengths", []),
+                "improvementPriorities": result.get("improvementPriorities", []),
+                "rewriteSuggestions": result.get("rewriteSuggestions", []),
+                "summary": result.get("summary"),
                 "recommendedResources": resources,
                 "model": result.get("model"),
             }
