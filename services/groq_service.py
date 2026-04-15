@@ -132,10 +132,13 @@ Return ONLY a perfectly formatted JSON object with this exact structure:
 }}
 
 STRICT URL RULES:
-- Every url MUST start with https://
-- Focus on primary documentation, reputable YouTube channels, and top courses.
-- No broken links or generic search pages.
-- Do not include null or placeholder URLs.
+1. Every URL MUST start with https://
+2. TRUSTED DOMAINS: Prefer official docs (e.g., flutter.dev, dart.dev, react.dev, python.org, aws.amazon.com), YouTube.com, Coursera.org, or Udemy.com.
+3. NO HALLUCINATIONS: Do NOT guess specific sub-page paths or video IDs if you are not 100% certain.
+4. SEARCH FALLBACK: If you are unsure of a direct link, use a YouTube Search URL or Official Docs search URL. 
+   - Example YouTube Search: https://www.youtube.com/results?search_query={skill_name.replace(' ', '+')}+tutorial
+   - Example Docs Search: https://docs.flutter.dev/search?q={skill_name.replace(' ', '+')}
+5. NO BROKEN LINKS: Avoid generating random-looking strings (IDs) that might not exist.
 
 No conversational text outside the JSON block."""
 
@@ -250,6 +253,13 @@ STRICT JSON RULES:
 - matchScore, atsScore, keywordCoverage must be integers 0-100.
 - No markdown, no prose, and no conversational text outside the JSON block.
 - status in atsChecks must be only pass, warn, or fail.
+
+STRICT RESOURCE URL RULES:
+1. Every URL MUST start with https://
+2. NO HALLUCINATIONS: Do NOT guess specific sub-page paths or video IDs. 
+3. SEARCH FALLBACK: If you are unsure of a direct link, use a YouTube Search URL for that skill.
+   - Format: https://www.youtube.com/results?search_query=SKILL+NAME+tutorial
+4. PREFER OFFICIAL: Use root documentation URLs if specific paths are unknown (e.g., https://docs.flutter.dev).
 """
 
     try:
@@ -285,15 +295,31 @@ STRICT JSON RULES:
 
 
 def _sanitize_resources(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate and filter resources to ensure URLs are strictly HTTPS."""
+    """Validate and filter resources to ensure URLs are strictly HTTPS and realistic."""
+    blacklist = ["example.com", "placeholder.com", "yourdomain.com", "test.com"]
+    
     if "recommendedResources" in data and isinstance(data["recommendedResources"], list):
         valid_resources = []
         for resource in data["recommendedResources"]:
             if not isinstance(resource, dict):
                 continue
-            url = resource.get("url", "")
-            if isinstance(url, str) and url.startswith("https://") and len(url) > 12:
-                valid_resources.append(resource)
+                
+            url = str(resource.get("url", "")).strip()
+            
+            # Basic validation
+            if not url.startswith("https://") or len(url) < 15:
+                continue
+                
+            # Blacklist check
+            if any(domain in url.lower() for domain in blacklist):
+                continue
+            
+            # Hallucination pattern check: catch URLs with placeholders like [skill]
+            if "[" in url or "{" in url:
+                continue
+                
+            valid_resources.append(resource)
+            
         data["recommendedResources"] = valid_resources
     return data
 
