@@ -38,6 +38,10 @@ class ResumeAnalyzeRequest(BaseModel):
         description="The raw text extracted from the resume",
         max_length=15000,
     )
+    job_description: Optional[str] = Field(
+        default=None,
+        description="Optional detailed job description or requirements",
+    )
     user_id: Optional[str] = Field(
         default=None,
         description="Optional ID of the user performing the analysis",

@@ -168,17 +168,40 @@ No conversational text outside the JSON block."""
         _handle_exception(error)
 
 
-async def analyze_resume_ai(resume_text: str, job_role: str) -> Dict[str, Any]:
+async def analyze_resume_ai(
+    resume_text: str,
+    job_role: str,
+    job_description: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Analyze a resume against a job role and return ATS-friendly structured output.
+    Analyze a resume against a job role and optional description.
+    Returns ATS-friendly structured output with accurate scoring.
     """
     client = get_client()
-    prompt = f"""You are an expert ATS (Applicant Tracking System) resume auditor and career coach.
 
-Task: Analyze this resume for the target role: {job_role}.
+    # Build context for the AI
+    requirements_context = ""
+    if job_description and job_description.strip():
+        requirements_context = f"\nSpecific Job Requirements/Description:\n{job_description}\n"
+
+    prompt = f"""You are an expert ATS (Applicant Tracking System) resume auditor and senior technical recruiter.
+
+Task: Provide a high-precision analysis of the human resume text against the target role: {job_role}.
+{requirements_context}
 
 Resume Text:
 {resume_text}
+
+Analyze the match based on skills, experience level, and the specific keywords provided in the job description (if any).
+
+Rules for Match Score Calculation:
+- **Be Rigorous**: Do not default to generic scores. A score of 85+ should only be given for near-perfect matches.
+- **Scoring Breakdown**:
+    - 0-30: Total mismatch or missing 70%+ of core requirements.
+    - 31-50: Significant gaps in skills or seniority level.
+    - 51-70: Fair match, has core skills but missing several secondary keywords.
+    - 71-85: Strong match, missing only minor specific tools or domain experience.
+    - 86-100: Exceptional candidate, matches nearly all keywords and experience levels.
 
 Return ONLY valid JSON with this exact structure:
 {{
@@ -212,7 +235,7 @@ Return ONLY valid JSON with this exact structure:
   "rewriteSuggestions": [
     "Resume bullet rewrite suggestion"
   ],
-  "summary": "2-3 sentence ATS summary",
+  "summary": "2-3 sentence ATS summary explaining exactly why this score was given.",
   "recommendedResources": [
     {{
       "title": "Resource title",
@@ -223,18 +246,17 @@ Return ONLY valid JSON with this exact structure:
   ]
 }}
 
-Rules:
+STRICT JSON RULES:
 - matchScore, atsScore, keywordCoverage must be integers 0-100.
+- No markdown, no prose, and no conversational text outside the JSON block.
 - status in atsChecks must be only pass, warn, or fail.
-- sectionScores must include at least: Summary, Experience, Skills, Projects, Education, Formatting.
-- Keep findings specific to the given resume and role.
-- Every resource URL must start with https:// and point to a direct page.
-- No markdown and no prose outside JSON."""
+"""
 
     try:
         logger.info(
-            "Resume analysis to Groq | role=%s | model=llama-3.1-8b-instant",
+            "Resume analysis to Groq | role=%s | has_desc=%s | model=llama-3.1-8b-instant",
             job_role,
+            bool(job_description),
         )
         completion = await client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -243,12 +265,12 @@ Rules:
                     "role": "system",
                     "content": (
                         "You are a professional ATS resume auditor. "
-                        "Always return valid JSON with realistic, direct HTTPS URLs."
+                        "You provide honest, rigorous, and highly specific feedback."
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.1,
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
 

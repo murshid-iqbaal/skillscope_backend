@@ -50,6 +50,7 @@ async def analyze_resume(
         result = await analyze_resume_ai(
             resume_text=resume_text,
             job_role=request.job_role,
+            job_description=request.job_description,
         )
 
         # 2. Save to database for analytics (Background Task)
@@ -90,6 +91,7 @@ async def analyze_resume(
 async def validate_resume(
     job_role: str = Form(..., description="Target job role"),
     resume: UploadFile = File(..., description="Resume file (PDF/Docx)"),
+    description: Optional[str] = Form(None, description="Optional job requirements/description"),
     background_tasks: BackgroundTasks = None,
     user_id: Optional[str] = Form(None, description="Optional user ID"),
 ):
@@ -106,7 +108,8 @@ async def validate_resume(
         # 2. Call AI service
         result = await analyze_resume_ai(
             resume_text=resume_text[:12000],
-            job_role=job_role
+            job_role=job_role,
+            job_description=description,
         )
         
         # 3. Wrap in 'analysis' key (expected by Flutter ResumeApiService)
